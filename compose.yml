@@ -1,0 +1,13 @@
+version: '3.8'
+networks:
+  net:
+
+services:
+  worker:
+    image: worker
+    container_name: main-worker
+    build:
+      context: .
+      dockerfile: ./worker.dockerfile
+    networks:
+      - net
