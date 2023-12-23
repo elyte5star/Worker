@@ -1,21 +1,26 @@
 package org.elyte.worker;
 import java.io.Serializable;
-import java.util.List;
-import org.elyte.enums.JobState;
 import org.elyte.enums.JobStatus;
+import org.elyte.enums.JobType;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Data;
+import java.util.Set;
+
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class Job implements Serializable{
+
+    private static final long serialVersionUID = 1234567L;
+
     private String jid;
     private String created;
-    private List<Task> tasks;
-    private String jobRequest;
-    private Enum<JobState> jobType;
+    private Set<Task> tasks=null;
+    private String bookingRequest;
+    private JobType jobType;
     private JobStatus jobStatus;
     private int numberOfTasks;
+
 }

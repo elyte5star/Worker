@@ -11,7 +11,7 @@ public class JobStatus implements Serializable {
 
     private static final long serialVersionUID = 1L;
     
-    private Enum<JobState> jobState;
+    private JobState jobState;
 
     private boolean finished=false;
     

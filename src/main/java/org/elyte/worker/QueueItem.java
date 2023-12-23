@@ -1,6 +1,6 @@
 package org.elyte.worker;
 import lombok.NoArgsConstructor;
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -8,12 +8,12 @@ import lombok.Data;
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-public class QueueItem implements Serializable{
+public class QueueItem {
 
-    private static final long serialVersionUID = 1L;
-
+    @JsonProperty("Job")
     private Job job;
 
+    @JsonProperty("Task")
     private Task task;
     
 }

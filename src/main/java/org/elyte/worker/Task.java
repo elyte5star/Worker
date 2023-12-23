@@ -3,6 +3,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.io.Serializable;
+
 import org.elyte.enums.JobStatus;
 
 
@@ -11,21 +12,11 @@ import org.elyte.enums.JobStatus;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Task implements Serializable{
+    private static final long serialVersionUID = 1234567L;
     private String tid;
-
     private String created;
-
-    private String jib;
-
-    private String result;
-
     private String started;
-
-   
     private String finished;
-
- 
     private JobStatus status;
 
-    
 }

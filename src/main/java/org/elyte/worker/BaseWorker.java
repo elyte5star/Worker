@@ -1,21 +1,27 @@
 package org.elyte.worker;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Map;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
+import org.elyte.booking.BookingHandler;
 import org.elyte.enums.JobStatus;
 import org.elyte.enums.WorkerType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.rabbitmq.client.DeliverCallback;
+import org.elyte.util.UtilityFunctions;
+import org.json.CDL;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @Data
 @AllArgsConstructor
@@ -23,10 +29,9 @@ import com.rabbitmq.client.DeliverCallback;
 public class BaseWorker {
 
     private WorkerType workerType;
-
-    private String QUEUE_NAME="BOOKING";
-    private String EXCHANGE_NAME ="elyteExchange";
-    private String KEY_NAME="rkey-two";
+    private String QUEUE_NAME = "BOOKING";
+    private String EXCHANGE_NAME = "elyteExchange";
+    private String KEY_NAME = "rkey-two";
 
     // JDBC driver name and database URL
 
@@ -35,12 +40,12 @@ public class BaseWorker {
     private static Connection conn = null;
 
     public CreateWorker createWorker() {
-        CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), timeNow(), this.workerType,
+        CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), UtilityFunctions.timeNow(), this.workerType,
                 this.QUEUE_NAME);
         return worker;
     }
 
-    public final Connection dbConnection() {
+    private final static Connection dbConnection() {
         try {
             Class.forName(JDBC_DRIVER);
         } catch (final ClassNotFoundException e) {
@@ -79,7 +84,7 @@ public class BaseWorker {
         String sql = "UPDATE TASKS SET STATUS=?, STARTED=? WHERE TASK_ID=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setString(1, taskStatus.toString());
-            preparedStmt.setString(2, timeNow());
+            preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setString(3, tid);
             int rowsInserted = preparedStmt.executeUpdate();
             System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
@@ -96,7 +101,7 @@ public class BaseWorker {
         String sql = "UPDATE TASKS SET STATUS=?, FINISHED=?,RESULT=? WHERE TASK_ID=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setString(1, taskStatus.toString());
-            preparedStmt.setString(2, timeNow());
+            preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setString(3, result.toString());
             preparedStmt.setString(4, tid);
             int rowsInserted = preparedStmt.executeUpdate();
@@ -113,31 +118,45 @@ public class BaseWorker {
     public void listenToMessage() {
         Queue queue = new Queue();
         queue.createExchangeQueue(QUEUE_NAME, EXCHANGE_NAME, "direct", KEY_NAME);
+        DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+            String queueItemStr = new String(delivery.getBody(), "UTF-8");
+            QueueItem queueItem = new ObjectMapper().readValue(queueItemStr,QueueItem.class);
+            try {
+                doWork(queueItem);
+
+            } catch (Exception e) {
+
+                e.printStackTrace();
+
+            } finally {
+                System.err.println(" [x] Done");
+                queue.getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+
+            }
+
+        };
         queue.listenToQueue(QUEUE_NAME, deliverCallback);
-    }
-
-    DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-        String queueItemJson = new String(delivery.getBody(), "UTF-8");
-        Map<String, Object> queueItem = new ObjectMapper().readValue(queueItemJson,
-                new TypeReference<Map<String, Object>>() {
-                });
-        System.out.println(" [x] Received " + queueItem.get("job") + " ");
-        try {
-            doWork(queueItem);
-        } finally {
-            System.err.println(" [x] Done");
-
-        }
-
-    };
-
-    private static void doWork(Map<String, Object> queueItem) {
 
     }
 
-    private String timeNow() {
-        LocalDateTime current = LocalDateTime.now();
-        return current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    private Map<String, Object> doWork(QueueItem queueJob) throws Exception {
+        System.out.println("JOB TYPE " + queueJob );
+        //String jobType = queueJob.get("Job").get("jobType").toString();
+        Map<String, Object> result = new HashMap<String, Object>();
+        // switch (jobType) {
+        //     case "BOOKING":
+        //         System.out.println("JOB TYPE ");
+        //         BookingHandler bookingHandler = new BookingHandler();
+        //         //result = bookingHandler.createBooking(queueJob, dbConnection());
+        //         break;
+        //     case "SEARCH":
+        //         System.out.println("JOB TYPE ");
+        //         break;
+        //     default:
+        //         result = Map.of("status", false, "message", "Unknown Job type");
+        //         break;
+        // }
+        return result;
 
     }
 

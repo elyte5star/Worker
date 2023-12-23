@@ -1,13 +1,16 @@
 package org.elyte.worker;
-
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import java.nio.charset.StandardCharsets;
+import lombok.Getter;
+
 
 public class Queue {
     private static final String HOST = "localhost";
+
+    @Getter
     private Channel channel;
    
 
@@ -36,7 +39,7 @@ public class Queue {
 
     public void listenToQueue(String queueName, DeliverCallback dlr) {
         try {
-            channel.basicConsume(queueName, true, dlr, consumerTag -> {
+            channel.basicConsume(queueName, false, dlr, consumerTag -> {
             });
 
         } catch (Exception e) {

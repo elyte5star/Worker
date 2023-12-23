@@ -6,6 +6,6 @@ public enum JobState {
     PENDING,
     FINISHED,
     TIMEOUT,
-    NOTASK
+    NOTASK;
     
 }
