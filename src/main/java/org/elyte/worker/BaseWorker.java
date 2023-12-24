@@ -8,21 +8,18 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
 import org.elyte.booking.BookingHandler;
-import org.elyte.enums.JobStatus;
-import org.elyte.enums.JobType;
+import org.elyte.enums.State;
+import org.elyte.enums.Status;
 import org.elyte.enums.WorkerType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.rabbitmq.client.DeliverCallback;
 import org.elyte.util.UtilityFunctions;
-import org.json.CDL;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.io.IOException;
 
 @Data
 @AllArgsConstructor
@@ -38,10 +35,11 @@ public class BaseWorker {
 
     static final String JDBC_DRIVER = "org.mariadb.jdbc.Driver";
     static final String DB_URL = "jdbc:mariadb://localhost:3306/elyte";
-    private static Connection conn = null;
+   
 
     public CreateWorker createWorker() {
-        CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), UtilityFunctions.timeNow(), this.workerType,
+        CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), UtilityFunctions.timeNow(),
+                this.workerType,
                 this.QUEUE_NAME);
         return worker;
     }
@@ -57,7 +55,7 @@ public class BaseWorker {
             final Connection con = DriverManager.getConnection(DB_URL, "userExample", "54321");
             return con;
         } catch (SQLException e) {
-            System.err.println("ERROR" + e);
+            System.err.println("ERROR " + e);
             return null;
         }
     }
@@ -74,32 +72,25 @@ public class BaseWorker {
             System.out.print("NUMBER OF ROWS INSERTED: " + rowsInserted);
         } catch (Exception e) {
             System.err.println("ERROR" + e);
-        } finally {
-            conn.close();
-
-        }
-
+        } 
     }
 
-    public void updateONGoingTaskStatusInDb(String tid, JobStatus taskStatus) throws Exception {
-        String sql = "UPDATE TASKS SET STATUS=?, STARTED=? WHERE TASK_ID=?";
+    public void updateONGoingTaskStatusInDb(String tid, Status taskStatus) throws Exception {
+        String sql = "UPDATE tasks SET status=?, started=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
-            preparedStmt.setString(1, taskStatus.toString());
+            preparedStmt.setObject(1, entityToObject(taskStatus));
             preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setString(3, tid);
             int rowsInserted = preparedStmt.executeUpdate();
             System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
         } catch (Exception e) {
-            System.err.println("ERROR" + e);
-        } finally {
-            conn.close();
-
-        }
+            System.err.println("UPDATE ERROR 1" + e.getLocalizedMessage());
+        } 
 
     }
 
-    public void updateFinishedTaskInDb(String tid, JobStatus taskStatus, Map<String, Object> result) throws Exception {
-        String sql = "UPDATE TASKS SET STATUS=?, FINISHED=?,RESULT=? WHERE TASK_ID=?";
+    public void updateFinishedTaskInDb(String tid, Status taskStatus, Map<String, Object> result) throws Exception {
+        String sql = "UPDATE tasks SET status=?, finished=?WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setString(1, taskStatus.toString());
             preparedStmt.setString(2, UtilityFunctions.timeNow());
@@ -108,11 +99,8 @@ public class BaseWorker {
             int rowsInserted = preparedStmt.executeUpdate();
             System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
         } catch (Exception e) {
-            System.err.println("ERROR" + e);
-        } finally {
-            conn.close();
-
-        }
+            System.err.println("UPDATE ERROR 2" + e.getLocalizedMessage());
+        } 
 
     }
 
@@ -121,13 +109,13 @@ public class BaseWorker {
         queue.createExchangeQueue(QUEUE_NAME, EXCHANGE_NAME, "direct", KEY_NAME);
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String queueItemStr = new String(delivery.getBody(), "UTF-8");
-            QueueItem queueItem = new ObjectMapper().readValue(queueItemStr,QueueItem.class);
+            QueueItem queueItem = new ObjectMapper().readValue(queueItemStr, QueueItem.class);
             try {
-                Map<String, Object> result =doWork(queueItem);
+                Map<String, Object> result = doWork(queueItem);
 
             } catch (Exception e) {
 
-                e.printStackTrace();
+                System.err.println("ERROR" + e.getLocalizedMessage());
 
             } finally {
                 System.err.println(" [x] Done");
@@ -141,21 +129,52 @@ public class BaseWorker {
     }
 
     private Map<String, Object> doWork(QueueItem queueItem) throws Exception {
-        Job job = queueItem.getJob();
         Map<String, Object> result = new HashMap<String, Object>();
-        switch (job.getJobType()) {
-            case BOOKING:
-                BookingHandler bookingHandler = new BookingHandler();
-                result = bookingHandler.createBooking(queueItem, dbConnection());
-                break;
-            case SEARCH:
-                System.out.println("JOB TYPE1 ");
-                break;
-            default:
-                result = Map.of("status", false, "message", "Unknown Job type");
-                break;
+        try {
+            Status jobStatus = new Status(State.PENDING, false);
+            updateONGoingTaskStatusInDb(queueItem.getTask().getTid(), jobStatus);
+            switch (queueItem.getJob().getJobType()) {
+                case BOOKING:
+                    BookingHandler bookingHandler = new BookingHandler();
+                    result = bookingHandler.createBooking(queueItem, dbConnection());
+                    break;
+                case SEARCH:
+                    System.out.println("JOB TYPE ");
+                    break;
+                default:
+                    result = Map.of("status", false, "message", "Unknown Job type");
+                    break;
+            }
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
         }
+
         return result;
+
+    }
+
+    public Object entityToObject(Status taskStatus) {
+
+        byte[] data = null;
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(baos);
+            oos.writeObject(taskStatus);
+            oos.flush();
+            oos.close();
+            baos.close();
+            data = baos.toByteArray();
+        } catch (IOException ex) {
+            data = null;
+            System.err.println("ERROR :" + ex.getLocalizedMessage());
+
+        }
+
+        return data;
 
     }
 

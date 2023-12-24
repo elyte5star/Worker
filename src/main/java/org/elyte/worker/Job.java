@@ -1,6 +1,6 @@
 package org.elyte.worker;
 import java.io.Serializable;
-import org.elyte.enums.JobStatus;
+import org.elyte.enums.Status;
 import org.elyte.enums.JobType;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -20,7 +20,7 @@ public class Job implements Serializable{
     private Set<Task> tasks=null;
     private String bookingRequest;
     private JobType jobType;
-    private JobStatus jobStatus;
+    private Status jobStatus;
     private int numberOfTasks;
 
 }

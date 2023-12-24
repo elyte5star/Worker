@@ -7,12 +7,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobStatus implements Serializable {
+public class Status implements Serializable {
 
     private static final long serialVersionUID = 1L;
     
-    private JobState jobState;
+    private State jobState;
 
-    private boolean finished=false;
+    private boolean done=false;
     
 }

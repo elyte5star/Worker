@@ -4,7 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
-import org.elyte.enums.JobStatus;
+import org.elyte.enums.Status;
 
 
 
@@ -16,7 +16,7 @@ public class Task implements Serializable{
     private String tid;
     private String created;
     private String started;
-    private String finished;
-    private JobStatus status;
+    private String ended;
+    private Status status;
 
 }
