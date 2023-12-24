@@ -10,6 +10,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class UtilityFunctions {
     static SecureRandom rnd = new SecureRandom();
@@ -47,18 +49,21 @@ public class UtilityFunctions {
                 });
     }
 
-    public static Map<String, Map<String, Map<String, Object>>> jsonToMap2(String jsonObject)
-            throws JsonMappingException, JsonProcessingException {
-        return new ObjectMapper().readValue(jsonObject,
-                new TypeReference<Map<String, Map<String, Map<String, Object>>>>() {
-                });
-    }
+   
 
     public static Map<String, Object> objectToMap(Object object) {
         return new ObjectMapper().convertValue(object,
                 new TypeReference<Map<String, Object>>() {
                 });
 
+    }
+
+    public static String convertObjectToGson(Object object) throws JsonProcessingException {
+        if (object == null) {
+            return null;
+        }
+        Gson gson  = new GsonBuilder().create();
+        return gson.toJson(object);
     }
 
 }

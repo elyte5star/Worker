@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.elyte.booking.BookingHandler;
 import org.elyte.enums.JobStatus;
+import org.elyte.enums.JobType;
 import org.elyte.enums.WorkerType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -52,7 +53,7 @@ public class BaseWorker {
             System.err.println("ERROR" + e);
         }
         try {
-            System.out.print("Connecting to a selected database...");
+            System.out.println("Connecting to a selected database...");
             final Connection con = DriverManager.getConnection(DB_URL, "userExample", "54321");
             return con;
         } catch (SQLException e) {
@@ -122,7 +123,7 @@ public class BaseWorker {
             String queueItemStr = new String(delivery.getBody(), "UTF-8");
             QueueItem queueItem = new ObjectMapper().readValue(queueItemStr,QueueItem.class);
             try {
-                doWork(queueItem);
+                Map<String, Object> result =doWork(queueItem);
 
             } catch (Exception e) {
 
@@ -139,23 +140,21 @@ public class BaseWorker {
 
     }
 
-    private Map<String, Object> doWork(QueueItem queueJob) throws Exception {
-        System.out.println("JOB TYPE " + queueJob );
-        //String jobType = queueJob.get("Job").get("jobType").toString();
+    private Map<String, Object> doWork(QueueItem queueItem) throws Exception {
+        Job job = queueItem.getJob();
         Map<String, Object> result = new HashMap<String, Object>();
-        // switch (jobType) {
-        //     case "BOOKING":
-        //         System.out.println("JOB TYPE ");
-        //         BookingHandler bookingHandler = new BookingHandler();
-        //         //result = bookingHandler.createBooking(queueJob, dbConnection());
-        //         break;
-        //     case "SEARCH":
-        //         System.out.println("JOB TYPE ");
-        //         break;
-        //     default:
-        //         result = Map.of("status", false, "message", "Unknown Job type");
-        //         break;
-        // }
+        switch (job.getJobType()) {
+            case BOOKING:
+                BookingHandler bookingHandler = new BookingHandler();
+                result = bookingHandler.createBooking(queueItem, dbConnection());
+                break;
+            case SEARCH:
+                System.out.println("JOB TYPE1 ");
+                break;
+            default:
+                result = Map.of("status", false, "message", "Unknown Job type");
+                break;
+        }
         return result;
 
     }
