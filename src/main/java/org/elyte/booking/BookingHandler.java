@@ -27,14 +27,13 @@ public class BookingHandler {
             preparedStmt.setBigDecimal(4, bookingJob.getTotalPrice());
             preparedStmt.setObject(5, UtilityFunctions.convertObjectToGson(bookingJob.getShippingAddress()));
             preparedStmt.setObject(6, UtilityFunctions.convertObjectToGson(bookingJob.getCart()));
-            int rowsInserted = preparedStmt.executeUpdate();
-            System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
-            responseMessage.put("status", true);
-            responseMessage.put("message", rowsInserted);
+            preparedStmt.executeUpdate();
+            responseMessage.put("success", true);
+            responseMessage.put("message", queueItem.getTask().getTid());
 
         } catch (Exception e) {
-            responseMessage.put("status", false);
-            responseMessage.put("message", e.getMessage());
+            responseMessage.put("success", false);
+            responseMessage.put("message",queueItem.getTask().getTid());
             System.err.println("ERROR" + e);
         }
 

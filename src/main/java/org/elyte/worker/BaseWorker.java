@@ -82,26 +82,28 @@ public class BaseWorker {
             preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setString(3, tid);
             preparedStmt.executeUpdate();
-            
+
         }
 
     }
 
-    public void updateFinishedTaskInDb(String tid, boolean is_successful) throws Exception {
+    public void updateFinishedTaskInDb(String tid, boolean is_successful) {
         String sql = "UPDATE tasks SET finished=?,state=?,ended_at=?,successful=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setBoolean(1, true);
             preparedStmt.setString(2, State.FINISHED.name());
-            preparedStmt.setString(2, UtilityFunctions.timeNow());
-            preparedStmt.setBoolean(3, is_successful);
-            preparedStmt.setString(4, tid);
+            preparedStmt.setString(3, UtilityFunctions.timeNow());
+            preparedStmt.setBoolean(4, is_successful);
+            preparedStmt.setString(5, tid);
             preparedStmt.executeUpdate();
-           
+
+        } catch (Exception e) {
+            System.err.println("UPDATE FINNISHED TASK ERROR 2" + e.getLocalizedMessage());
         }
 
     }
 
-    public void listenToMessage() throws Exception{
+    public void listenToMessage() throws Exception {
         Queue queue = new Queue();
         queue.createExchangeQueue(QUEUE_NAME, EXCHANGE_NAME, "direct", KEY_NAME);
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
@@ -109,7 +111,6 @@ public class BaseWorker {
             QueueItem queueItem = new ObjectMapper().readValue(queueItemStr, QueueItem.class);
             try {
                 doWork(queueItem);
-
             } finally {
                 System.out.println(" [x] Done");
                 queue.getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
@@ -122,6 +123,7 @@ public class BaseWorker {
 
     private void doWork(QueueItem queueItem) {
         Map<String, Object> result = new HashMap<String, Object>();
+        boolean is_successful = false;
         try {
 
             updateONGoingTaskStatusInDb(queueItem.getTask().getTid());
@@ -135,8 +137,7 @@ public class BaseWorker {
                     break;
                 default:
                     throw new Exception("Unknown job type :" + queueItem.getJob().getJobType());
-                // result = Map.of("status", false, "message", "Unknown Job type");
-                // break;
+
             }
 
         } catch (Exception e) {
@@ -145,8 +146,10 @@ public class BaseWorker {
 
         }
 
-        System.out.println(result.get("status") + " " + result.get("message"));
-
+        System.out.println(" [+] " + result.get("success") + " " + result.get("message"));
+        if (Boolean.TRUE.equals(result.get("success")))
+            is_successful = true;
+        updateFinishedTaskInDb(queueItem.getTask().getTid(), is_successful);
 
     }
 
