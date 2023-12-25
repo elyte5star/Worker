@@ -20,7 +20,6 @@ public class BookingHandler {
         BookingJob bookingJob = new ObjectMapper().readValue(queueItem.getJob().getBookingRequest(), BookingJob.class);
         String sql = " insert into bookings (booking_id,created,owner_id, total_price, shipping_details,cart)"
                 + " values (?, ?,?, ?, ?,?)";
-        System.out.println("request ");
         try (PreparedStatement preparedStmt = conn.prepareStatement(sql)) {
             preparedStmt.setString(1, UtilityFunctions.generateUuidString());
             preparedStmt.setString(2, UtilityFunctions.timeNow());

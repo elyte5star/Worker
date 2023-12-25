@@ -35,7 +35,6 @@ public class BaseWorker {
 
     static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
     static final String DB_URL = "jdbc:mysql://localhost:3306/elyte?" + "user=userExample&password=54321";
-   
 
     public CreateWorker createWorker() {
         CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), UtilityFunctions.timeNow(),
@@ -45,7 +44,7 @@ public class BaseWorker {
     }
 
     private final static Connection dbConnection() {
-       
+
         try {
             Class.forName(JDBC_DRIVER);
         } catch (final ClassNotFoundException e) {
@@ -63,7 +62,7 @@ public class BaseWorker {
         }
     }
 
-    public void insertWorkerToDb(CreateWorker worker, Connection conn) throws Exception{
+    public void insertWorkerToDb(CreateWorker worker, Connection conn) throws Exception {
         String sql = " insert into workers (worker_id, created, worker_type, queue_name)"
                 + " values (?, ?, ?, ?)";
         try (PreparedStatement preparedStmt = conn.prepareStatement(sql)) {
@@ -76,51 +75,55 @@ public class BaseWorker {
         }
     }
 
-    public void updateONGoingTaskStatusInDb(String tid) throws Exception{
+    public void updateONGoingTaskStatusInDb(String tid) throws Exception {
         String sql = "UPDATE tasks SET state=?,started_at=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
-            preparedStmt.setString(1,State.PENDING.name());
+            preparedStmt.setString(1, State.PENDING.name());
             preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setString(3, tid);
-            int rowsInserted = preparedStmt.executeUpdate();
-            System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
+            preparedStmt.executeUpdate();
+            
         }
-       
+
     }
 
-    public void updateFinishedTaskInDb(String tid, boolean is_successful) throws Exception{
+    public void updateFinishedTaskInDb(String tid, boolean is_successful) throws Exception {
         String sql = "UPDATE tasks SET finished=?,state=?,ended_at=?,successful=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
-            preparedStmt.setBoolean(1,true);
-            preparedStmt.setString(2,State.FINISHED.name());
+            preparedStmt.setBoolean(1, true);
+            preparedStmt.setString(2, State.FINISHED.name());
             preparedStmt.setString(2, UtilityFunctions.timeNow());
             preparedStmt.setBoolean(3, is_successful);
             preparedStmt.setString(4, tid);
-            int rowsInserted = preparedStmt.executeUpdate();
-            System.out.println("NUMBER OF ROWS INSERTED: " + rowsInserted);
-        } 
+            preparedStmt.executeUpdate();
+           
+        }
 
     }
 
-    public void listenToMessage(){
+    public void listenToMessage() throws Exception{
         Queue queue = new Queue();
         queue.createExchangeQueue(QUEUE_NAME, EXCHANGE_NAME, "direct", KEY_NAME);
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String queueItemStr = new String(delivery.getBody(), "UTF-8");
             QueueItem queueItem = new ObjectMapper().readValue(queueItemStr, QueueItem.class);
-            Map<String, Object> result = doWork(queueItem);
-            System.out.println(result.get("status") + " " + result.get("message"));
-            queue.getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-             
+            try {
+                doWork(queueItem);
+
+            } finally {
+                System.out.println(" [x] Done");
+                queue.getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+            }
+
         };
         queue.listenToQueue(QUEUE_NAME, deliverCallback);
 
     }
 
-    private Map<String, Object> doWork(QueueItem queueItem){
+    private void doWork(QueueItem queueItem) {
         Map<String, Object> result = new HashMap<String, Object>();
         try {
-           
+
             updateONGoingTaskStatusInDb(queueItem.getTask().getTid());
             switch (queueItem.getJob().getJobType()) {
                 case BOOKING:
@@ -132,17 +135,18 @@ public class BaseWorker {
                     break;
                 default:
                     throw new Exception("Unknown job type :" + queueItem.getJob().getJobType());
-                    //result = Map.of("status", false, "message", "Unknown Job type");
-                   // break;
+                // result = Map.of("status", false, "message", "Unknown Job type");
+                // break;
             }
 
         } catch (Exception e) {
 
-             System.err.println(" [x] Error :" + e.getLocalizedMessage());
+            System.err.println(" [x] Error :" + e.getLocalizedMessage());
 
         }
 
-        return result;
+        System.out.println(result.get("status") + " " + result.get("message"));
+
 
     }
 
