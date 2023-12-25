@@ -11,8 +11,10 @@ public class Status implements Serializable {
 
     private static final long serialVersionUID = 1L;
     
-    private State jobState;
+    private State state;
 
-    private boolean done=false;
+    private boolean finished;
+
+    private boolean successful;
     
 }

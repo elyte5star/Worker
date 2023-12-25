@@ -15,8 +15,8 @@ public class Task implements Serializable{
     private static final long serialVersionUID = 1234567L;
     private String tid;
     private String created;
-    private String started;
-    private String ended;
-    private Status status;
+    private String startedAt;
+    private String endedAt;
+    private Status taskStatus;
 
 }
