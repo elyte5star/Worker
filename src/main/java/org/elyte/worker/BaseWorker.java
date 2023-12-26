@@ -9,32 +9,35 @@ import java.sql.SQLException;
 import java.util.UUID;
 import org.elyte.booking.BookingHandler;
 import org.elyte.enums.State;
-import org.elyte.enums.Status;
 import org.elyte.enums.WorkerType;
+import org.elyte.queue.Queue;
+import org.elyte.queue.QueueItem;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.DeliverCallback;
+import org.elyte.util.AppConfig;
 import org.elyte.util.UtilityFunctions;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Data
+@Setter
+@Getter
 @AllArgsConstructor
-@NoArgsConstructor
-public class BaseWorker {
+public class BaseWorker extends AppConfig {
 
     private WorkerType workerType;
     private String QUEUE_NAME = "BOOKING";
-    private String EXCHANGE_NAME = "elyteExchange";
-    private String KEY_NAME = "rkey-two";
+    private String EXCHANGE_NAME;
+    private String ROUTING_KEY_NAME = "booking";
 
-    // JDBC driver name and database URL
+    private static final Logger log = LoggerFactory.getLogger(BaseWorker.class);
 
-    static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
-    static final String DB_URL = "jdbc:mysql://localhost:3306/elyte?" + "user=userExample&password=54321";
+    public BaseWorker() {
+        this.EXCHANGE_NAME = this.getConfigValue("EXCHANGE_NAME");
+
+    }
 
     public CreateWorker createWorker() {
         CreateWorker worker = new CreateWorker(UUID.randomUUID().toString(), UtilityFunctions.timeNow(),
@@ -43,21 +46,20 @@ public class BaseWorker {
         return worker;
     }
 
-    private final static Connection dbConnection() {
+    private final Connection dbConnection() {
 
         try {
-            Class.forName(JDBC_DRIVER);
+            Class.forName(this.getConfigValue("JDBC_DRIVER"));
         } catch (final ClassNotFoundException e) {
             System.err.println("ERROR " + e);
         }
         try {
-            System.out.println("Connecting to a selected database...");
-            final Connection conn = DriverManager.getConnection(DB_URL);
+            final Connection conn = DriverManager.getConnection(this.getConfigValue("DB_URL"));
             return conn;
         } catch (SQLException ex) {
-            System.err.println("SQLException: " + ex.getMessage());
-            System.err.println("SQLState: " + ex.getSQLState());
-            System.err.println("VendorError: " + ex.getErrorCode());
+            log.error("SQLException: " + ex.getMessage());
+            log.error("SQLState: " + ex.getSQLState());
+            log.error("VendorError: " + ex.getErrorCode());
             return null;
         }
     }
@@ -71,7 +73,7 @@ public class BaseWorker {
             preparedStmt.setString(3, worker.getWorkerType().toString());
             preparedStmt.setString(4, worker.getQueueName());
             int rowsInserted = preparedStmt.executeUpdate();
-            System.out.print("NUMBER OF ROWS INSERTED: " + rowsInserted);
+            log.info("NUMBER OF ROWS INSERTED: " + rowsInserted);
         }
     }
 
@@ -87,32 +89,33 @@ public class BaseWorker {
 
     }
 
-    public void updateFinishedTaskInDb(String tid, boolean is_successful) {
-        String sql = "UPDATE tasks SET finished=?,state=?,ended_at=?,successful=? WHERE task_id=?";
+    public void updateFinishedTaskInDb(String tid, boolean is_successful, Map<String, Object> taskResult) {
+        String sql = "UPDATE tasks SET finished=?,state=?,ended_at=?,successful=?,result=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setBoolean(1, true);
             preparedStmt.setString(2, State.FINISHED.name());
             preparedStmt.setString(3, UtilityFunctions.timeNow());
             preparedStmt.setBoolean(4, is_successful);
-            preparedStmt.setString(5, tid);
+            preparedStmt.setString(5, UtilityFunctions.convertObjectToGson(taskResult));
+            preparedStmt.setString(6, tid);
             preparedStmt.executeUpdate();
 
         } catch (Exception e) {
-            System.err.println("UPDATE FINNISHED TASK ERROR 2" + e.getLocalizedMessage());
+            log.error("UPDATE FINISHED TASK ERROR " + e.getLocalizedMessage());
         }
 
     }
 
     public void listenToMessage() throws Exception {
         Queue queue = new Queue();
-        queue.createExchangeQueue(QUEUE_NAME, EXCHANGE_NAME, "direct", KEY_NAME);
+        queue.createExchangeQueue(QUEUE_NAME, this.EXCHANGE_NAME, "direct", ROUTING_KEY_NAME);
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String queueItemStr = new String(delivery.getBody(), "UTF-8");
             QueueItem queueItem = new ObjectMapper().readValue(queueItemStr, QueueItem.class);
             try {
-                doWork(queueItem);
+                doWork(queueItem, queue);
             } finally {
-                System.out.println(" [x] Done");
+                log.info(" [x] Done");
                 queue.getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
             }
 
@@ -121,12 +124,12 @@ public class BaseWorker {
 
     }
 
-    private void doWork(QueueItem queueItem) {
-        Map<String, Object> result = new HashMap<String, Object>();
+    private void doWork(QueueItem queueItem, Queue queue) {
+        Map<String, Map<String, Object>> result = new HashMap<String, Map<String, Object>>();
         boolean is_successful = false;
         try {
-
             updateONGoingTaskStatusInDb(queueItem.getTask().getTid());
+
             switch (queueItem.getJob().getJobType()) {
                 case BOOKING:
                     BookingHandler bookingHandler = new BookingHandler();
@@ -142,46 +145,20 @@ public class BaseWorker {
 
         } catch (Exception e) {
 
-            System.err.println(" [x] Error :" + e.getLocalizedMessage());
+            queue.createExchangeQueue(this.getConfigValue("LOST_QUEUE_NAME"), this.EXCHANGE_NAME, "direct",
+                    this.getConfigValue("LOST_ROUTING_KEY"));
+            String message = UtilityFunctions.convertObjectToJson(queueItem);
+            queue.sendMessage(this.EXCHANGE_NAME, this.getConfigValue("LOST_ROUTING_KEY"), message);
+            log.error(" [x] Error :" + e.getLocalizedMessage());
 
+        } finally {
+            if (Boolean.TRUE.equals(result.get("result").get("success"))) {
+                is_successful = true;
+            }
+
+            updateFinishedTaskInDb(queueItem.getTask().getTid(), is_successful, result.get("result"));
         }
 
-        System.out.println(" [+] " + result.get("success") + " " + result.get("message"));
-        if (Boolean.TRUE.equals(result.get("success")))
-            is_successful = true;
-        updateFinishedTaskInDb(queueItem.getTask().getTid(), is_successful);
-
     }
 
-    public Object entityToObject(Status taskStatus) {
-
-        byte[] data = null;
-
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-            oos.writeObject(taskStatus);
-            oos.flush();
-            oos.close();
-            baos.close();
-            data = baos.toByteArray();
-        } catch (IOException ex) {
-            data = null;
-            System.err.println("ERROR :" + ex.getLocalizedMessage());
-
-        }
-
-        return data;
-
-    }
-
-    @Override
-    public String toString() {
-        return "BaseWorker{" +
-                "workerType=" + workerType +
-                ", QUEUE_NAME='" + QUEUE_NAME + '\'' +
-                ", EXCHANGE_NAME='" + EXCHANGE_NAME + '\'' +
-                ", KEY_NAME='" + KEY_NAME + '\'' +
-                '}';
-    }
 }

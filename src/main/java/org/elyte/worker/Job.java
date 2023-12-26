@@ -17,7 +17,7 @@ public class Job implements Serializable{
 
     private String jid;
     private String created;
-    private Set<Task> tasks=null;
+    private Set<Task> tasks;
     private String bookingRequest;
     private JobType jobType;
     private Status jobStatus;

@@ -18,5 +18,6 @@ public class Task implements Serializable{
     private String startedAt;
     private String endedAt;
     private Status taskStatus;
+    private String result;
 
 }

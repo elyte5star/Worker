@@ -1,39 +1,47 @@
-package org.elyte.worker;
+package org.elyte.queue;
+
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import java.nio.charset.StandardCharsets;
+import com.rabbitmq.client.MessageProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.elyte.util.AppConfig;
 import lombok.Getter;
 
-
-public class Queue {
-    private static final String HOST = "localhost";
+public class Queue extends AppConfig {
 
     @Getter
     private Channel channel;
-   
+
+    private static final Logger log = LoggerFactory.getLogger(Queue.class);
+    
 
     public Queue() {
+
         ConnectionFactory cf = new ConnectionFactory();
-        cf.setHost(HOST);
+
+        cf.setHost(this.getConfigValue("RABBIT_HOST"));
+
         try {
             Connection connection = cf.newConnection();
             channel = connection.createChannel();
         } catch (Exception e) {
-            System.err.println(e);
+            log.error("[+] Connection Exception: ", e.getLocalizedMessage());
         }
     }
 
     public void createExchangeQueue(String queueName, String exchangeName, String exchangeType, String key) {
         try {
             channel.queueDeclare(queueName, true, false, false, null);
-            channel.exchangeDeclare(exchangeName, exchangeType,true);
+            channel.exchangeDeclare(exchangeName, exchangeType, true);
             channel.queueBind(queueName, exchangeName, key);
             channel.basicQos(1); // accept only one unack-ed message at a time
-            System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+            log.info(" [*] Waiting for messages. To exit press CTRL+C");
         } catch (Exception e) {
-            System.err.println(e);
+            log.error("[+] Creating Exchange Exception: ", e.getLocalizedMessage());
         }
     }
 
@@ -43,15 +51,15 @@ public class Queue {
             });
 
         } catch (Exception e) {
-            System.err.println(e);
+            log.error("[+] Consumer Exception: ", e.getLocalizedMessage());
         }
     }
 
     public void sendMessage(String exchange, String key, String message) {
         try {
-            channel.basicPublish(exchange, key, null, message.getBytes(StandardCharsets.UTF_8));
+            channel.basicPublish(exchange, key, MessageProperties.PERSISTENT_TEXT_PLAIN, message.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            System.err.println(e);
+            log.error("[+] Publisher Exception: ", e.getLocalizedMessage());
         }
     }
 
