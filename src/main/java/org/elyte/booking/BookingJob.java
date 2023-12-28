@@ -8,8 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Data
 public class BookingJob {
-
-   
     private String userid;
     private BigDecimal totalPrice;
     private Cart cart;

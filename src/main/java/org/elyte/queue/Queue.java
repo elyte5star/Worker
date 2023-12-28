@@ -24,6 +24,10 @@ public class Queue extends AppConfig {
         ConnectionFactory cf = new ConnectionFactory();
 
         cf.setHost(this.getConfigValue("RABBIT_HOST"));
+        cf.setUsername(this.getConfigValue("RABBITMQ_DEFAULT_USER"));
+        cf.setPassword(this.getConfigValue("RABBITMQ_DEFAULT_PASS"));
+        cf.setVirtualHost("/");
+        cf.setPort(Integer.valueOf(this.getConfigValue("RABBITMQ_NODE_PORT")));
 
         try {
             Connection connection = cf.newConnection();
