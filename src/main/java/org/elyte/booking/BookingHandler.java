@@ -2,11 +2,12 @@ package org.elyte.booking;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-import java.util.Map;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import org.elyte.queue.QueueItem;
 import org.elyte.util.AppConfig;
+import org.elyte.worker.WorkResult;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,7 @@ public class BookingHandler extends AppConfig{
 
     private static final Logger log = LoggerFactory.getLogger(BookingHandler.class);
 
-    public Map<String, Object> createBooking(QueueItem queueItem, Connection conn)
+    public WorkResult createBooking(QueueItem queueItem, Connection conn)
             throws Exception {
         BookingJob bookingJob = new ObjectMapper().readValue(queueItem.getJob().getJobRequest(), BookingJob.class);
         String sql = " insert into bookings (booking_id,created,owner_id, total_price, shipping_details,cart)"
@@ -33,7 +34,7 @@ public class BookingHandler extends AppConfig{
             preparedStmt.setObject(6, this.convertObjectToGson(bookingJob.getCart()));
             preparedStmt.executeUpdate();
             log.info("[+] CREATED BOOKING WITH ID: " + Id);
-            return Map.of("taskId", queueItem.getTask().getTid(), "data", Id, "success", true);
+            return new WorkResult(queueItem.getTask().getTid(),true,Id);
 
         } 
        

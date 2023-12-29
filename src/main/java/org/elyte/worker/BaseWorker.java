@@ -1,7 +1,5 @@
 package org.elyte.worker;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -95,15 +93,15 @@ public class BaseWorker extends AppConfig implements Runnable {
 
     }
 
-    public void updateFinishedTaskInDb(String tid, boolean is_successful, Object taskResult) {
+    public void updateFinishedTaskInDb(WorkResult result) {
         String sql = "UPDATE tasks SET finished=?,state=?,ended_at=?,successful=?,result=? WHERE task_id=?";
         try (PreparedStatement preparedStmt = dbConnection().prepareStatement(sql)) {
             preparedStmt.setBoolean(1, true);
             preparedStmt.setString(2, State.FINISHED.name());
             preparedStmt.setString(3, this.timeNow());
-            preparedStmt.setBoolean(4, is_successful);
-            preparedStmt.setString(5, this.convertObjectToGson(taskResult));
-            preparedStmt.setString(6, tid);
+            preparedStmt.setBoolean(4, result.isSuccess());
+            preparedStmt.setString(5, this.convertObjectToGson(result.getResult()));
+            preparedStmt.setString(6, result.getTid());
             preparedStmt.executeUpdate();
 
         } catch (Exception e) {
@@ -133,10 +131,9 @@ public class BaseWorker extends AppConfig implements Runnable {
     }
 
     private void doWork(QueueItem queueItem, Queue queue) {
-        Map<String, Object> result = new HashMap<String, Object>();
-        boolean is_successful = false;
+        WorkResult result = new WorkResult(queueItem.getTask().getTid(), false, null);
         try {
-            updateONGoingTaskStatusInDb(queueItem.getTask().getTid());
+            updateONGoingTaskStatusInDb(result.getTid());
 
             switch (queueItem.getJob().getJobType()) {
                 case BOOKING:
@@ -158,16 +155,10 @@ public class BaseWorker extends AppConfig implements Runnable {
                     this.getConfigValue("LOST_ROUTING_KEY"));
             String message = this.convertObjectToJson(queueItem);
             queue.sendMessage(this.EXCHANGE_NAME, this.getConfigValue("LOST_ROUTING_KEY"), message);
-            result.put("taskId", queueItem.getTask().getTid());
-            result.put( "data", null);
-            result.put( "success", false);
             log.error(" [x] Error, Item sent to dead letter queue :");
 
         } finally {
-            if (Boolean.TRUE.equals(result.get("success"))) {
-                is_successful = true;
-            }
-            updateFinishedTaskInDb(queueItem.getTask().getTid(), is_successful,result.get("data"));
+            updateFinishedTaskInDb(result);
         }
 
     }

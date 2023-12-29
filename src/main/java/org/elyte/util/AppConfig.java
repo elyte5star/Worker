@@ -31,6 +31,8 @@ public class AppConfig {
 
     static SecureRandom rnd = new SecureRandom();
 
+    public static DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+
     static final String AB = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
     private static final Logger log = LoggerFactory.getLogger(AppConfig.class);
@@ -73,8 +75,7 @@ public class AppConfig {
 
     public String timeNow() {
         LocalDateTime current = LocalDateTime.now();
-        return current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-
+        return current.format(dtf);
     }
 
     public long timeDiff(LocalDateTime start, LocalDateTime end) {
@@ -106,6 +107,13 @@ public class AppConfig {
         }
         Gson gson = new GsonBuilder().create();
         return gson.toJson(object);
+    }
+
+    public long diff(String start, String end) {
+        LocalDateTime dateTime1 = LocalDateTime.parse(start, dtf);
+        LocalDateTime dateTime2 = LocalDateTime.parse(end, dtf);
+        Duration duration = Duration.between(dateTime1, dateTime2);
+        return Math.abs(duration.toMillis());
     }
 
     public Object entityToObject(Status taskStatus) {
