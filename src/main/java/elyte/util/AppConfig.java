@@ -14,8 +14,6 @@ import java.util.UUID;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
 import java.time.Duration;
@@ -40,11 +38,14 @@ public class AppConfig {
 
     private Properties properties;
 
+    public  ObjectMapper mapper;
+
     public AppConfig() {
 
         try (FileInputStream configInput = new FileInputStream(CONFIG_FILE)) {
             this.properties = new Properties();
             this.properties.load(configInput);
+            this.mapper = new ObjectMapper();
         } catch (FileNotFoundException e) {
             log.error("[+] Config Exception ", e.getLocalizedMessage());
         } catch (IOException e) {
@@ -85,7 +86,7 @@ public class AppConfig {
     public String convertObjectToJson(Object object) {
         String result = null;
         try {
-            result = new ObjectMapper().writeValueAsString(object);
+            result =this.mapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
             System.err.println(e);
 
@@ -94,19 +95,13 @@ public class AppConfig {
     }
 
     public Map<String, Object> objectToMap(Object object) {
-        return new ObjectMapper().convertValue(object,
+        return this.mapper.convertValue(object,
                 new TypeReference<Map<String, Object>>() {
                 });
 
     }
 
-    public String convertObjectToGson(Object object) {
-        if (object == null) {
-            return null;
-        }
-        Gson gson = new GsonBuilder().create();
-        return gson.toJson(object);
-    }
+    
 
     public long diff(String start, String end) {
         LocalDateTime dateTime1 = LocalDateTime.parse(start, dtf);

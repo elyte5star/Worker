@@ -7,7 +7,6 @@ import java.sql.PreparedStatement;
 import elyte.queue.QueueItem;
 import elyte.util.AppConfig;
 import elyte.worker.WorkResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +19,7 @@ public class BookingHandler extends AppConfig{
 
     public WorkResult createBooking(QueueItem queueItem, Connection conn)
             throws Exception {
-        BookingJob bookingJob = new ObjectMapper().readValue(queueItem.getJob().getJobRequest(), BookingJob.class);
+        BookingJob bookingJob = this.mapper.readValue(queueItem.getJob().getJobRequest(), BookingJob.class);
         String sql = " insert into bookings (booking_id,created,owner_id, total_price, shipping_details,cart)"
                 + " values (?, ?,?, ?, ?,?)";
         final String Id = this.generateUuidString();
@@ -29,8 +28,8 @@ public class BookingHandler extends AppConfig{
             preparedStmt.setString(2, this.timeNow());
             preparedStmt.setString(3, bookingJob.getUserid());
             preparedStmt.setBigDecimal(4, bookingJob.getTotalPrice());
-            preparedStmt.setObject(5, this.convertObjectToGson(bookingJob.getShippingAddress()));
-            preparedStmt.setObject(6, this.convertObjectToGson(bookingJob.getCart()));
+            preparedStmt.setObject(5, this.convertObjectToJson(bookingJob.getShippingAddress()));
+            preparedStmt.setObject(6, this.convertObjectToJson(bookingJob.getCart()));
             preparedStmt.executeUpdate();
             log.info("[+] CREATED BOOKING WITH ID: " + Id);
             return new WorkResult(queueItem.getTask().getTid(),true,Id);

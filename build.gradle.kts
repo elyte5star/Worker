@@ -20,7 +20,6 @@ dependencies {
     compileOnly("org.projectlombok:lombok:1.18.30")
     annotationProcessor("org.projectlombok:lombok:1.18.30")
     implementation("com.rabbitmq:amqp-client:5.20.0")
-    implementation("com.google.code.gson:gson:2.10.1")
     implementation("mysql:mysql-connector-java:8.0.33")
     implementation("org.slf4j:slf4j-simple:2.0.9")
     implementation("org.slf4j:slf4j-api:2.0.9")
@@ -50,4 +49,9 @@ application {
 tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+}
+tasks.withType<Jar> {
+    manifest {
+        attributes["Main-Class"] = "elyte.MainWorker"
+    }
 }

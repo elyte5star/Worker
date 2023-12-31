@@ -13,7 +13,6 @@ import elyte.search.SearchHandler;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.DeliverCallback;
 import elyte.util.AppConfig;
 
@@ -100,7 +99,7 @@ public class BaseWorker extends AppConfig implements Runnable {
             preparedStmt.setString(2, State.FINISHED.name());
             preparedStmt.setString(3, this.timeNow());
             preparedStmt.setBoolean(4, result.isSuccess());
-            preparedStmt.setString(5, this.convertObjectToGson(result.getResult()));
+            preparedStmt.setString(5, this.convertObjectToJson(result.getResult()));
             preparedStmt.setString(6, result.getTid());
             preparedStmt.executeUpdate();
 
@@ -116,7 +115,7 @@ public class BaseWorker extends AppConfig implements Runnable {
         queue.createExchangeQueue(QUEUE_NAME, this.EXCHANGE_NAME, "direct", ROUTING_KEY_NAME);
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
             String queueItemStr = new String(delivery.getBody(), "UTF-8");
-            QueueItem queueItem = new ObjectMapper().readValue(queueItemStr, QueueItem.class);
+            QueueItem queueItem = this.mapper.readValue(queueItemStr, QueueItem.class);
             try {
                 doWork(queueItem, queue);
             } finally {
