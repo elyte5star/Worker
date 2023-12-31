@@ -88,7 +88,7 @@ public class AppConfig {
         try {
             result =this.mapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
-            System.err.println(e);
+            log.error("[x] JsonProcessingException Exception ", e.getLocalizedMessage());
 
         }
         return result;
